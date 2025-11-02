@@ -281,27 +281,46 @@ jobs:
           name: root-output-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
           path: ./target-root
           if_no_artifact_found: warn
-
+      
       - name: ROOT comparison (mul/diff_* in isu_sample_4.root)
         if: github.event_name == 'pull_request'
-        run: |
-          set -euo pipefail
+        uses: aidasoft/run-lcg-view@v5
+        with:
+          release-platform: ${{ matrix.release }}/${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.opt }}
+          run: |
+            set -euo pipefail
 
-          echo "::group::Verify PR ROOT output"
-          test -f trees/isu_sample_4.root || { echo "PR ROOT output not found: trees/isu_sample_4.root"; exit 1; }
-          echo "Found PR ROOT: trees/isu_sample_4.root"
-          echo "::endgroup::"
+            # Filenames unique per matrix entry
+            COMP_TXT="compare-trees-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}.txt"
 
-          if [ ! -f ./target-root/isu_sample_4.root ]; then
-            echo "No baseline ROOT found at ./target-root/isu_sample_4.root"
-            echo "(Likely first run after enabling uploads on main.)"
-            exit 0
-          fi
+            echo "::group::Verify PR ROOT output"
+            test -f trees/isu_sample_4.root || { echo "PR ROOT output not found: trees/isu_sample_4.root"; exit 1; }
+            echo "Found PR ROOT: trees/isu_sample_4.root"
+            echo "::endgroup::"
 
-          echo "::group::Run compare via ROOT macro"
-          # Call macro at rootScripts/ci/CompareTrees.C
-          root -l -b -q 'rootScripts/ci/CompareTrees.C("./target-root/isu_sample_4.root","trees/isu_sample_4.root","mul","diff_")'
-          echo "::endgroup::"
+            if [ ! -f ./target-root/isu_sample_4.root ]; then
+              echo "No baseline ROOT found at ./target-root/isu_sample_4.root"
+              echo "(Likely first run after enabling uploads on main.)"
+              exit 0
+            fi
+
+            echo "::group::Run compare via ROOT macro"
+            # Call macro at rootScripts/ci/CompareTrees.C
+            root -l -b -q 'rootScripts/ci/CompareTrees.C("./target-root/isu_sample_4.root","trees/isu_sample_4.root","mul","diff_")'
+            root -l -b -q 'rootScripts/ci/CompareTrees.C("./target-root/isu_sample_4.root","trees/isu_sample_4.root","mul","diff_")' \
+            | tee "$COMP_TXT"
+            echo "::endgroup::"
+            
+            
+      - name: Upload compare-trees output
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v5
+        with:
+          name: compare-trees-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
+          path: |
+            compare-trees-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}.txt
+        retention-days: 7
+        if-no-files-found: error
 
 
       - name: Compare artifacts
