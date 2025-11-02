@@ -298,7 +298,7 @@ jobs:
             exit 0
           fi
 
-          echo "::group::Run compare via repo macro"
+          echo "::group::Run compare via ROOT macro"
           # Call macro at rootScripts/ci/CompareTrees.C
           root -l -b -q 'rootScripts/ci/CompareTrees.C("./target-root/isu_sample_4.root","trees/isu_sample_4.root","mul","diff_")'
           echo "::endgroup::"
