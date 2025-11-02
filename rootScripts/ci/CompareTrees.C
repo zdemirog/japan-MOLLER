@@ -38,8 +38,8 @@ void CompareTrees(const char* fileRef,
     bool bad = (n1 != n2) || (m1 != m2) || (r1 != r2);
 
     printf("-- %s --\n", b.Data());
-    printf("  ref: n=%lld mean=%.10g rms=%.10g\n", (long long)n1, m1, r1);
-    printf("  pr: n=%lld mean=%.10g rms=%.10g%s\n",
+    printf("  ref: n=%lld mean=%.11g rms=%.11g\n", (long long)n1, m1, r1);
+    printf("  pr: n=%lld mean=%.11g rms=%.11g%s\n",
            (long long)n2, m2, r2, bad ? "  <-- DIFF" : "");
 
     if (bad) fail = true;
