@@ -302,13 +302,20 @@ jobs:
 
             # Filenames unique per matrix entry
             COMP_TXT="compare-trees-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}.txt"
+            #PR Number in output file names
+            PRNUM=${{ github.event.pull_request.number }}
+            PR_ROOT="trees/isu_sample_4_pr${PRNUM}.root"
+            BASE_ROOT="./target-root/isu_sample_4.root"
 
             echo "::group::Verify PR ROOT output"
-            test -f trees/isu_sample_4.root || { echo "PR ROOT output not found: trees/isu_sample_4.root"; exit 1; }
-            echo "Found PR ROOT: trees/isu_sample_4.root"
+            if [ ! -f "$PR_ROOT" ] && [ -f trees/isu_sample_4.root ]; then
+                mv trees/isu_sample_4.root "$PR_ROOT"
+            fi
+            test -f "$PR_ROOT" || { echo "PR ROOT output not found: $PR_ROOT"; exit 1; }
+            echo "Found PR ROOT: $PR_ROOT"
             echo "::endgroup::"
 
-            if [ ! -f ./target-root/isu_sample_4.root ]; then
+            if [ ! -f "$BASE_ROOT" ]; then
               echo "No baseline ROOT found at ./target-root/isu_sample_4.root"
               echo "(Likely first run after enabling uploads on main.)"
               exit 0
@@ -316,11 +323,11 @@ jobs:
 
             echo "::group::Run compare via ROOT macro"
             # Call macro at rootScripts/ci/CompareTrees.C
-            root -l -b -q 'rootScripts/ci/CompareTrees.C("./target-root/isu_sample_4.root","trees/isu_sample_4.root","mul","diff_")' \
+            root -l -b -q "rootScripts/ci/CompareTrees.C(\"$BASE_ROOT\",\"$PR_ROOT\",\"mul\",\"diff_\")" \
             | tee "$COMP_TXT"
             echo "::endgroup::"
-            
-            
+          
+          
       - name: Upload compare-trees output
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v5
