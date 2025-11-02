@@ -288,6 +288,9 @@ jobs:
         with:
           release-platform: ${{ matrix.release }}/${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.opt }}
           run: |
+            # Use a unique container name per matrix entry to avoid conflict
+            export VIEW_NAME="view_worker_${{ matrix.release }}_${{ matrix.arch }}_${{ matrix.compiler }}"
+            echo "VIEW_NAME=${VIEW_NAME}"
             set -euo pipefail
 
             # Filenames unique per matrix entry
