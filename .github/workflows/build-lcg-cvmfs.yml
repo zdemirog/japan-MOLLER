@@ -5,6 +5,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
+  workflow_dispatch: 
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -196,6 +197,14 @@ jobs:
             fi
             echo "::endgroup::"
 
+      - name: Upload ROOT file (isu_sample_4.root)
+        uses: actions/upload-artifact@v5
+        with:
+          name: root-output-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
+          path: trees/isu_sample_4.root
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Compress build directory
         run: tar -caf build.tar.zst build/
       - name: Upload build artifact
@@ -262,6 +271,38 @@ jobs:
           name: regalias-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
           path: ./target
           if_no_artifact_found: warn
+
+      - name: Download target branch artifacts (root outputs)
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v11
+        with:
+          workflow: build-lcg-cvmfs.yml
+          branch: ${{ github.event.pull_request.base.ref }}
+          name: root-output-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
+          path: ./target-root
+          if_no_artifact_found: warn
+
+      - name: ROOT comparison (mul/diff_* in isu_sample_4.root)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+
+          echo "::group::Verify PR ROOT output"
+          test -f trees/isu_sample_4.root || { echo "PR ROOT output not found: trees/isu_sample_4.root"; exit 1; }
+          echo "Found PR ROOT: trees/isu_sample_4.root"
+          echo "::endgroup::"
+
+          if [ ! -f ./target-root/isu_sample_4.root ]; then
+            echo "No baseline ROOT found at ./target-root/isu_sample_4.root"
+            echo "(Likely first run after enabling uploads on main.)"
+            exit 0
+          fi
+
+          echo "::group::Run compare via repo macro"
+          # Call macro at rootScripts/ci/CompareTrees.C
+          root -l -b -q 'rootScripts/ci/CompareTrees.C("./target-root/isu_sample_4.root","trees/isu_sample_4.root","mul","diff_")'
+          echo "::endgroup::"
+
 
       - name: Compare artifacts
         if: github.event_name == 'pull_request'
