@@ -330,6 +330,18 @@ jobs:
           name: root-output-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
           path: ./target
           if_no_artifact_found: warn
+   
+      - name: Download target branch artifacts (root-slim)
+        if: github.event_name == 'pull_request'
+        uses: dawidd6/action-download-artifact@v11
+        with:
+          workflow: build-lcg-cvmfs.yml
+          branch: ${{ github.event.pull_request.base.ref }}
+          workflow_conclusion: completed
+          name: root-slim-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
+          path: ./target
+          if_no_artifact_found: warn
+
 
       - name: Cleanup previous view_worker Docker containers
         run: |
@@ -355,12 +367,26 @@ jobs:
             PR_ROOT_SLIM="trees/isu_sample_4.slim.root"
             BASE_ROOT="./target/isu_sample_4.slim.root"
 
+            
             echo "::group::Verify PR ROOT output"
             test -f "trees/isu_sample_4.root" || { echo "Missing trees/isu_sample_4.root"; exit 1; }
             test -f "$PR_ROOT_SLIM" || root -l -b -q 'skim_mul.C("trees/isu_sample_4.root","trees/isu_sample_4.slim.root")'
             test -f "$PR_ROOT_SLIM" || { echo "Failed to produce slim ROOT"; exit 1; }
             echo "Found PR slim ROOT: $PR_ROOT_SLIM"
             echo "::endgroup::"
+
+            # Normalize baseline path expected by CompareTrees
+            if [ -f "./target/trees/isu_sample_4.slim.root" ]; then
+              cp ./target/trees/isu_sample_4.slim.root ./target/isu_sample_4.slim.root
+            fi
+
+            BASE_ROOT="./target/isu_sample_4.slim.root"
+
+            # Fallback: if only full ROOT exists on baseline, skim it now
+            if [ ! -f "$BASE_ROOT" ] && [ -f "./target/trees/isu_sample_4.root" ]; then
+              echo "Creating slim baseline ROOT from full baseline ROOT"
+              root -l -b -q 'skim_mul.C("./target/trees/isu_sample_4.root","./target/isu_sample_4.slim.root")'
+            fi
 
             if [ ! -f "$BASE_ROOT" ]; then
               echo "No baseline slim ROOT found at $BASE_ROOT"
