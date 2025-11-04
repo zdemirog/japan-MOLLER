@@ -70,17 +70,7 @@ jobs:
           ccache --set-config=compression=true
           ccache --zero-stats
           echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
-
-      - name: Cleanup any leftover view_worker containers
-        run: |
-          docker ps -aq --filter "name=view_worker" | xargs -r docker rm -f
-          docker ps -aq --filter "name=view_worker_" | xargs -r docker rm -f
-
-      - name: Build, run generators, and analyze (trees + optional rntuples)
-        uses: aidasoft/run-lcg-view@v5
-        env:
-          VIEW_NAME: view_worker_${{ matrix.release }}_${{ matrix.arch }}_${{ matrix.os }}_${{ matrix.compiler }}_${{ matrix.opt }}_${{ github.run_id }}_${{ github.job }}_build
-        
+      - uses: aidasoft/run-lcg-view@v5
         with:
           release-platform: ${{ matrix.release }}/${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.opt }}
           run: |
@@ -246,8 +236,6 @@ jobs:
 
       - name: Create and upload slim ROOT (keep mul)
         uses: aidasoft/run-lcg-view@v5
-        env:
-          VIEW_NAME: view_worker_${{ matrix.release }}_${{ matrix.arch }}_${{ matrix.os }}_${{ matrix.compiler }}_${{ matrix.opt }}_${{ github.run_id }}_${{ github.job }}_slim
         with:
           release-platform: ${{ matrix.release }}/${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.opt }}
           run: |
@@ -355,8 +343,6 @@ jobs:
       - name: ROOT comparison (mul/diff_* in isu_sample_4.slim.root)
         if: github.event_name == 'pull_request'
         uses: aidasoft/run-lcg-view@v5
-        env:
-          VIEW_NAME: view_worker_${{ matrix.release }}_${{ matrix.arch }}_${{ matrix.os }}_${{ matrix.compiler }}_${{ matrix.opt }}_${{ github.run_id }}_${{ github.job }}_cmp
         with:
           release-platform: ${{ matrix.release }}/${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.opt }}
           run: |
@@ -489,8 +475,6 @@ jobs:
         with:
           cvmfs_repositories: 'sft.cern.ch,geant4.cern.ch'
       - uses: aidasoft/run-lcg-view@v5
-        env:
-          VIEW_NAME: view_worker_${{ matrix.release }}_${{ matrix.arch }}_${{ matrix.os }}_${{ matrix.compiler }}_${{ matrix.opt }}_${{ github.run_id }}_${{ github.job }}_val
         with:
           release-platform: ${{ matrix.release }}/${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.opt }}
           run: |
