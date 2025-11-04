@@ -206,11 +206,11 @@ jobs:
           retention-days: 7
           if-no-files-found: error
         
-      - name: Create ROOT macro to strip mul
+      - name: Create ROOT macro to skim mul
         shell: bash
         run: |
-          cat > strip_mul.C <<'EOF'
-          void strip_mul(const char* inFile="trees/isu_sample_4.root",
+          cat > skim_mul.C <<'EOF'
+          void skim_mul(const char* inFile="trees/isu_sample_4.root",
                          const char* outFile="trees/isu_sample_4.slim.root") {
             TFile* fin = TFile::Open(inFile, "READ");
             if (!fin || fin->IsZombie()) { fprintf(stderr,"Cannot open %s\n", inFile); gSystem->Exit(1); }
@@ -219,7 +219,7 @@ jobs:
             while (TObject* o = nextkey()) {
               auto* key = (TKey*)o;
               TString name = key->GetName();
-              if (name == "mul") continue; // drop heavy tree
+              if (name != "mul") continue; // drop heavy tree
               TObject* obj = fin->Get(name);
               if (obj) { fout->cd(); obj->Write(); }
             }
@@ -227,12 +227,13 @@ jobs:
           }
           EOF
 
-      - name: Create and upload slim ROOT (drop mul)
+      - name: Create and upload slim ROOT (keep mul)
+        uses: aidasoft/run-lcg-view@v5
         shell: bash
         run: |
           set -euo pipefail
           test -f trees/isu_sample_4.root || { echo "Missing trees/isu_sample_4.root"; exit 1; }
-          root -l -b -q 'strip_mul.C("trees/isu_sample_4.root","trees/isu_sample_4.slim.root")'
+          root -l -b -q 'skim_mul.C("trees/isu_sample_4.root","trees/isu_sample_4.slim.root")'
           test -f trees/isu_sample_4.slim.root
         # upload the slim one
       - name: Upload slim ROOT
@@ -348,7 +349,7 @@ jobs:
 
             echo "::group::Verify PR ROOT output"
             test -f "trees/isu_sample_4.root" || { echo "Missing trees/isu_sample_4.root"; exit 1; }
-            test -f "$PR_ROOT_SLIM" || root -l -b -q 'strip_mul.C("trees/isu_sample_4.root","trees/isu_sample_4.slim.root")'
+            test -f "$PR_ROOT_SLIM" || root -l -b -q 'skim_mul.C("trees/isu_sample_4.root","trees/isu_sample_4.slim.root")'
             test -f "$PR_ROOT_SLIM" || { echo "Failed to produce slim ROOT"; exit 1; }
             echo "Found PR slim ROOT: $PR_ROOT_SLIM"
             echo "::endgroup::"
