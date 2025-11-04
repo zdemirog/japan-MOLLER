@@ -199,15 +199,20 @@ jobs:
 
 
       - name: Upload ROOT file (isu_sample_4.root)
-        uses: aidasoft/run-lcg-view@v5
+        uses: actions/upload-artifact@v5
         with:
           name: root-output-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
           path: trees/isu_sample_4.root
           retention-days: 7
           if-no-files-found: error
-        
-      - name: Create ROOT macro to skim mul
+    
+      - name: Setup LCG view
         uses: aidasoft/run-lcg-view@v5
+        with:
+            release-platform: ${{ matrix.release }}/${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.opt }}
+         
+    
+      - name: Create ROOT macro to skim mul
         shell: bash
         run: |
           cat > skim_mul.C <<'EOF'
@@ -228,8 +233,10 @@ jobs:
           }
           EOF
 
+
+
+
       - name: Create and upload slim ROOT (keep mul)
-        uses: aidasoft/run-lcg-view@v5
         shell: bash
         run: |
           set -euo pipefail
