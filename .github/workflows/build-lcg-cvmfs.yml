@@ -207,6 +207,7 @@ jobs:
           if-no-files-found: error
         
       - name: Create ROOT macro to skim mul
+        uses: aidasoft/run-lcg-view@v5
         shell: bash
         run: |
           cat > skim_mul.C <<'EOF'
