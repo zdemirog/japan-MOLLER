@@ -199,7 +199,7 @@ jobs:
 
 
       - name: Upload ROOT file (isu_sample_4.root)
-        uses: actions/upload-artifact@v5
+        uses: aidasoft/run-lcg-view@v5
         with:
           name: root-output-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
           path: trees/isu_sample_4.root
