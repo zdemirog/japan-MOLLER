@@ -242,12 +242,15 @@ jobs:
       - name: Create and upload slim ROOT (keep mul)
         shell: bash
         run: |
-          set -euo pipefail
+          set -eo pipefail
+          set +u
           LCG_PATH="/cvmfs/sft.cern.ch/lcg/views/${{ matrix.release }}/${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.opt }}"
           source "${LCG_PATH}/setup.sh"
+          set -u
           test -f trees/isu_sample_4.root || { echo "Missing trees/isu_sample_4.root"; exit 1; }
           root -l -b -q 'skim_mul.C("trees/isu_sample_4.root","trees/isu_sample_4.slim.root")'
           test -f trees/isu_sample_4.slim.root
+
 
         # upload the slim one
       - name: Upload slim ROOT
