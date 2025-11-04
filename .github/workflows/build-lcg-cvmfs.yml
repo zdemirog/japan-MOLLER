@@ -5,7 +5,7 @@ on:
   push:
     branches: [ main ]
   pull_request:
-  workflow_dispatch: 
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
@@ -197,6 +197,7 @@ jobs:
             fi
             echo "::endgroup::"
 
+
       - name: Upload ROOT file (isu_sample_4.root)
         uses: actions/upload-artifact@v5
         with:
@@ -204,6 +205,44 @@ jobs:
           path: trees/isu_sample_4.root
           retention-days: 7
           if-no-files-found: error
+        
+      - name: Create ROOT macro to strip mul
+        shell: bash
+        run: |
+          cat > strip_mul.C <<'EOF'
+          void strip_mul(const char* inFile="trees/isu_sample_4.root",
+                         const char* outFile="trees/isu_sample_4.slim.root") {
+            TFile* fin = TFile::Open(inFile, "READ");
+            if (!fin || fin->IsZombie()) { fprintf(stderr,"Cannot open %s\n", inFile); gSystem->Exit(1); }
+            TFile* fout = TFile::Open(outFile, "RECREATE");
+            TIter nextkey(fin->GetListOfKeys());
+            while (TObject* o = nextkey()) {
+              auto* key = (TKey*)o;
+              TString name = key->GetName();
+              if (name == "mul") continue; // drop heavy tree
+              TObject* obj = fin->Get(name);
+              if (obj) { fout->cd(); obj->Write(); }
+            }
+            fout->Write(); fout->Close(); fin->Close();
+          }
+          EOF
+
+      - name: Create and upload slim ROOT (drop mul)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f trees/isu_sample_4.root || { echo "Missing trees/isu_sample_4.root"; exit 1; }
+          root -l -b -q 'strip_mul.C("trees/isu_sample_4.root","trees/isu_sample_4.slim.root")'
+          test -f trees/isu_sample_4.slim.root
+        # upload the slim one
+      - name: Upload slim ROOT
+        uses: actions/upload-artifact@v5
+        with:
+          name: root-slim-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
+          path: trees/isu_sample_4.slim.root
+          retention-days: 7
+          if-no-files-found: error
+
 
       - name: Compress build directory
         run: tar -caf build.tar.zst build/
@@ -279,7 +318,7 @@ jobs:
           workflow: build-lcg-cvmfs.yml
           branch: ${{ github.event.pull_request.base.ref }}
           name: root-output-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
-          path: ./target-root
+          path: ./target
           if_no_artifact_found: warn
 
       - name: Cleanup previous view_worker Docker containers
@@ -288,8 +327,8 @@ jobs:
           if [ -n "$ids" ]; then
             docker rm -f $ids
           fi
-    
-      - name: ROOT comparison (mul/diff_* in isu_sample_4.root)
+
+      - name: ROOT comparison (mul/diff_* in isu_sample_4.slim.root)
         if: github.event_name == 'pull_request'
         uses: aidasoft/run-lcg-view@v5
         with:
@@ -300,34 +339,32 @@ jobs:
             echo "VIEW_NAME=${VIEW_NAME}"
             set -euo pipefail
 
-            # Filenames unique per matrix entry
+            # Filenames unique per matrix entry (for logs only)
             COMP_TXT="compare-trees-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}.txt"
-            #PR Number in output file names
-            PRNUM=${{ github.event.pull_request.number }}
-            PR_ROOT="trees/isu_sample_4_pr${PRNUM}.root"
-            BASE_ROOT="./target-root/isu_sample_4.root"
+
+            # Stable paths: keep standard filenames
+            PR_ROOT_SLIM="trees/isu_sample_4.slim.root"
+            BASE_ROOT="./target/isu_sample_4.slim.root"
 
             echo "::group::Verify PR ROOT output"
-            if [ ! -f "$PR_ROOT" ] && [ -f trees/isu_sample_4.root ]; then
-                mv trees/isu_sample_4.root "$PR_ROOT"
-            fi
-            test -f "$PR_ROOT" || { echo "PR ROOT output not found: $PR_ROOT"; exit 1; }
-            echo "Found PR ROOT: $PR_ROOT"
+            test -f "trees/isu_sample_4.root" || { echo "Missing trees/isu_sample_4.root"; exit 1; }
+            test -f "$PR_ROOT_SLIM" || root -l -b -q 'strip_mul.C("trees/isu_sample_4.root","trees/isu_sample_4.slim.root")'
+            test -f "$PR_ROOT_SLIM" || { echo "Failed to produce slim ROOT"; exit 1; }
+            echo "Found PR slim ROOT: $PR_ROOT_SLIM"
             echo "::endgroup::"
 
             if [ ! -f "$BASE_ROOT" ]; then
-              echo "No baseline ROOT found at ./target-root/isu_sample_4.root"
-              echo "(Likely first run after enabling uploads on main.)"
+              echo "No baseline slim ROOT found at $BASE_ROOT"
+              echo "(Likely first run or base branch not built recently.)"
               exit 0
             fi
 
             echo "::group::Run compare via ROOT macro"
-            # Call macro at rootScripts/ci/CompareTrees.C
-            root -l -b -q "rootScripts/ci/CompareTrees.C(\"$BASE_ROOT\",\"$PR_ROOT\",\"mul\",\"diff_\")" \
+            root -l -b -q "rootScripts/ci/CompareTrees.C(\"$BASE_ROOT\",\"$PR_ROOT_SLIM\",\"mul\",\"diff_\")" \
             | tee "$COMP_TXT"
             echo "::endgroup::"
-          
-          
+
+
       - name: Upload compare-trees output
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v5
