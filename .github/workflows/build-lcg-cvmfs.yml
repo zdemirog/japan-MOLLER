@@ -206,6 +206,11 @@ jobs:
           retention-days: 7
           if-no-files-found: error
     
+      - name: Remove existing view_worker container if exists
+        run: |
+          docker rm -f view_worker || true
+    
+    
       - name: Setup LCG view
         uses: aidasoft/run-lcg-view@v5
         with:
@@ -337,6 +342,8 @@ jobs:
             docker rm -f $ids
           fi
 
+
+    
       - name: ROOT comparison (mul/diff_* in isu_sample_4.slim.root)
         if: github.event_name == 'pull_request'
         uses: aidasoft/run-lcg-view@v5
