@@ -216,6 +216,13 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      - name: Cleanup previous view_worker Docker containers
+        run: |
+          ids=$(docker ps -a --filter "name=view_worker" -q)
+          if [ -n "$ids" ]; then
+            docker rm -f $ids
+          fi
+
       - name: Create ROOT macro to skim mul
         shell: bash
         run: |
