@@ -217,22 +217,39 @@ jobs:
         shell: bash
         run: |
           cat > skim_mul.C <<'EOF'
-          void skim_mul(const char* inFile="trees/isu_sample_4.root",
-                         const char* outFile="trees/isu_sample_4.slim.root") {
-            TFile* fin = TFile::Open(inFile, "READ");
-            if (!fin || fin->IsZombie()) { fprintf(stderr,"Cannot open %s\n", inFile); gSystem->Exit(1); }
-            TFile* fout = TFile::Open(outFile, "RECREATE");
-            TIter nextkey(fin->GetListOfKeys());
-            while (TObject* o = nextkey()) {
-              auto* key = (TKey*)o;
-              TString name = key->GetName();
-              if (name != "mul") continue; // keep only mul
-              TObject* obj = fin->Get(name);
-              if (obj) { fout->cd(); obj->Write(); }
-            }
-            fout->Write(); fout->Close(); fin->Close();
+          #include "TFile.h"
+          #include "TTree.h"
+          #include "TSystem.h"
+          #include <cstdio>
+
+          // Skims only the "mul" tree into a new ROOT file.
+          void skim_mul(const char* inFile  = "trees/isu_sample_4.root",
+                  const char* outFile = "trees/isu_sample_4.slim.root",
+                  const char* pathToMul = "mul") {
+           // Open input
+           TFile* fin = TFile::Open(inFile, "READ");
+           if (!fin || fin->IsZombie()) { std::fprintf(stderr,"Cannot open %s\n", inFile); gSystem->Exit(1); }
+
+           // Get the tree
+           TTree* tin = dynamic_cast<TTree*>(fin->Get(pathToMul));
+           if (!tin) { std::fprintf(stderr,"Could not find TTree \"%s\" in %s\n", pathToMul, inFile); gSystem->Exit(2); }
+
+           // Create output
+           TFile* fout = TFile::Open(outFile, "RECREATE");
+           if (!fout || fout->IsZombie()) { std::fprintf(stderr,"Cannot create %s\n", outFile); gSystem->Exit(3); }
+           fout->cd();
+
+           // Clone all entries/baskets
+           TTree* tout = tin->CloneTree(-1, "fast");
+           tout->SetDirectory(fout);
+           tout->Write();
+
+           fout->Write();
+           fout->Close();
+           fin->Close();
           }
           EOF
+
 
       - name: Create and upload slim ROOT (keep mul)
         uses: aidasoft/run-lcg-view@v5
