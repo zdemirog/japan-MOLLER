@@ -371,6 +371,7 @@ jobs:
     
       - name: ROOT comparison (mul/diff_* in isu_sample_4.slim.root)
         if: github.event_name == 'pull_request'
+        id: compare_trees
         uses: aidasoft/run-lcg-view@v5
         with:
           release-platform: ${{ matrix.release }}/${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.opt }}
@@ -379,51 +380,55 @@ jobs:
 
             # Filenames unique per matrix entry (for logs only)
             COMP_TXT="compare-trees-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}.txt"
+            : > "$COMP_TXT"  # create/empty the file up front so it always exists
 
             # Stable paths: keep standard filenames
             PR_ROOT_SLIM="trees/isu_sample_4.slim.root"
             BASE_ROOT="./target/isu_sample_4.slim.root"
 
-            
-            echo "::group::Verify PR ROOT output"
-            test -f "trees/isu_sample_4.root" || { echo "Missing trees/isu_sample_4.root"; exit 1; }
+            {
+              echo "== CompareTrees report =="
+              echo "Matrix: ${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}"
+              echo "Timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+              echo
+              echo "[Verify PR ROOT output]"
+            } >> "$COMP_TXT"
+
+            test -f "trees/isu_sample_4.root" || { echo "Missing trees/isu_sample_4.root" | tee -a "$COMP_TXT"; exit 1; }
             test -f "$PR_ROOT_SLIM" || root -l -b -q 'skim_mul.C("trees/isu_sample_4.root","trees/isu_sample_4.slim.root")'
-            test -f "$PR_ROOT_SLIM" || { echo "Failed to produce slim ROOT"; exit 1; }
-            echo "Found PR slim ROOT: $PR_ROOT_SLIM"
-            echo "::endgroup::"
+            test -f "$PR_ROOT_SLIM" || { echo "Failed to produce slim ROOT" | tee -a "$COMP_TXT"; exit 1; }
+            echo "Found PR slim ROOT: $PR_ROOT_SLIM" >> "$COMP_TXT"
 
             # Normalize baseline path expected by CompareTrees
             if [ -f "./target/trees/isu_sample_4.slim.root" ]; then
               cp ./target/trees/isu_sample_4.slim.root ./target/isu_sample_4.slim.root
             fi
-
             BASE_ROOT="./target/isu_sample_4.slim.root"
 
-            # Fallback: if only full ROOT exists on baseline, skim it now
+            # Fallback: skim root file
             if [ ! -f "$BASE_ROOT" ] && [ -f "./target/trees/isu_sample_4.root" ]; then
-              echo "Creating slim baseline ROOT from full baseline ROOT"
+              echo "Creating slim baseline ROOT from full baseline ROOT" >> "$COMP_TXT"
               root -l -b -q 'skim_mul.C("./target/trees/isu_sample_4.root","./target/isu_sample_4.slim.root")'
             fi
 
             if [ ! -f "$BASE_ROOT" ]; then
-              echo "No baseline slim ROOT found at $BASE_ROOT"
-              echo "(Likely first run or base branch not built recently.)"
+              echo "No baseline slim ROOT found at $BASE_ROOT" >> "$COMP_TXT"
+              echo "(Likely first run or base branch not built recently.)" >> "$COMP_TXT"
+              # Exit success: we still produced a report file so upload won't fail
               exit 0
             fi
 
-            echo "::group::Run compare via ROOT macro"
+            echo "[Run CompareTrees]" >> "$COMP_TXT"
+            # Append ROOT macro output into the same report file
             root -l -b -q "rootScripts/ci/CompareTrees.C(\"$BASE_ROOT\",\"$PR_ROOT_SLIM\",\"mul\",\"diff_\")" \
-            | tee "$COMP_TXT"
-            echo "::endgroup::"
-
+              | tee -a "$COMP_TXT"
 
       - name: Upload compare-trees output
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && hashFiles(format('compare-trees-{0}-{1}-{2}-{3}.txt', matrix.release, matrix.arch, matrix.os, matrix.compiler)) != ''
         uses: actions/upload-artifact@v5
         with:
           name: compare-trees-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}
-          path: |
-            compare-trees-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}.txt
+          path: compare-trees-${{ matrix.release }}-${{ matrix.arch }}-${{ matrix.os }}-${{ matrix.compiler }}.txt
           retention-days: 7
           if-no-files-found: error
 
