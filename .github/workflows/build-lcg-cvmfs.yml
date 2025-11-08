@@ -398,6 +398,13 @@ jobs:
           fi
           ls -R ./target || true
 
+      - name: Cleanup previous view_worker Docker containers
+        run: |
+          ids=$(docker ps -a --filter "name=view_worker" -q)
+          if [ -n "$ids" ]; then
+            docker rm -f $ids
+          fi
+          
       - name: ROOT comparison (mul/diff_* in isu_sample_4.slim.root)
         if: github.event_name == 'pull_request'
         uses: aidasoft/run-lcg-view@v5
