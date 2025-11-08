@@ -257,6 +257,13 @@ jobs:
           }
           EOF
 
+      - name: Cleanup previous view_worker Docker containers
+        run: |
+          ids=$(docker ps -a --filter "name=view_worker" -q)
+          if [ -n "$ids" ]; then
+            docker rm -f $ids
+          fi
+          
       - name: Make slim ROOT (keep only mul)
         uses: aidasoft/run-lcg-view@v5
         with:
