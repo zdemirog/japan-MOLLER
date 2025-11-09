@@ -87,3 +87,4 @@ To have your name properly tracked when committing (so that we know who is respo
   ```
   git commit --author=username
   ```
+

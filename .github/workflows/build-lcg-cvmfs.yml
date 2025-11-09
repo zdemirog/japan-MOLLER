@@ -390,8 +390,12 @@ jobs:
           set -euo pipefail
           mkdir -p ./target
           slim="$(find ./target -type f -name 'isu_sample_4.slim.root' | head -n1 || true)"
-          if [ -n "$slim" ]; then
-            cp "$slim" ./target/isu_sample_4.slim.root
+          if [ -n "${slim:-}" ]; then
+            if [ "$slim" != "./target/isu_sample_4.slim.root" ]; then
+              cp "$slim" ./target/isu_sample_4.slim.root
+            else
+              echo "Baseline slim already at ./target/isu_sample_4.slim.root"
+            fi
             echo "Baseline slim ready at ./target/isu_sample_4.slim.root"
           else
             echo "No baseline slim ROOT found under ./target"
