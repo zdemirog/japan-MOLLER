@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Standard builds without sanitizers
+          # Standard builds with submodules
           - release: "LCG_106"
             arch: "x86_64"
             os: "el9"
@@ -130,11 +130,12 @@ jobs:
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_INSTALL_PREFIX=install \
               -DCMAKE_CXX_FLAGS="${{ matrix.cxxflags }}" 2>&1 | tee cmake.txt
-            # Check the log file for unused variables
+
             if grep -q "Manually-specified variables were not used" cmake.txt; then
-                echo "ERROR: Unused CMake variables detected."
-                exit 1
+              echo "ERROR: Unused CMake variables detected."
+              exit 1
             fi
+
             cmake --build build -j$(nproc) --target install
             echo "::endgroup::"
 
@@ -328,6 +329,8 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      # --- PR-only: download base branch artifacts and compare ---
+
       - name: Download target branch artifacts (prompt summary)
         if: github.event_name == 'pull_request'
         uses: dawidd6/action-download-artifact@v11
@@ -451,7 +454,7 @@ jobs:
           comparison_failed=false
           for current_file in $current_files; do
             filename=$(basename "$current_file")
-            if [ -f ./target/$current_file ]; then
+            if [ -f "./target/$current_file" ]; then
               target_file="./target/$current_file"
             else
               target_file="./target/$filename"
@@ -471,11 +474,11 @@ jobs:
             else
               echo "❌ $current_file: Differences found beyond timestamps"
               echo "--- Expected (target branch) ---"
-              grep -v "Start Time:\|End Time:" "$target_file" | head -20
+              grep -v "Start Time:\|End Time:" "$target_file" | head -20 || true
               echo "--- Actual (current PR) ---"
-              grep -v "Start Time:\|End Time:" "$current_file" | head -20
+              grep -v "Start Time:\|End Time:" "$current_file" | head -20 || true
               echo "--- Detailed diff ---"
-              diff -u <(grep -v "Start Time:\|End Time:" "$target_file") <(grep -v "Start Time:\|End Time:" "$current_file") | head -50
+              diff -u <(grep -v "Start Time:\|End Time:" "$target_file") <(grep -v "Start Time:\|End Time:" "$current_file") | head -50 || true
               comparison_failed=true
             fi
           done
